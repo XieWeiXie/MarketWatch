@@ -28,8 +28,15 @@ class MarketCrawler(object):
         self.headers = marketwatch_config["headers"]
 
         # Field pattern
-        self.table = '//div[@class="financials"]/table[@class="crDataTable"]'    # 有返回值, 内容存在;
-        self.table_tr = self.table + "//tr/td"
+        self.table = '//div[@class="financials"]/table[@class="crDataTable"]//tr'    # 有返回值, 内容存在;
+        self.partialsum = self.table + "[@class='partialSum']"
+        self.childrow = self.table + "[@class='childRow']"
+        self.mainrow = self.table + "[@class='mainRow']"
+        self.rowlevel_2 = self.table + "[@class='rowLevel-2']"
+        self.rowlevel_3 = self.table + "[@class='rowLevel-3']"
+        self.totalrow = self.table + "[@class='totalRow']"
+
+        self.pattern = [self.partialsum, self.childrow, self.mainrow, self.rowlevel_2, self.rowlevel_3, self.totalrow]
 
     def get_tick_from_db(self):
         coll = self.collection
@@ -65,12 +72,14 @@ class MarketCrawler(object):
         :return:
         """
         selector = etree.HTML(response)
-        tr_content = selector.xpath(self.table_tr)
-        print len(tr_content)
-        for one in tr_content:
-            print one
+        tr_content = selector.xpath(self.table)
+        for one_content in tr_content:
+            one = selector.xpath(self.pattern[1])
+            print(one)
+
 
     def unpickle(self, data):
+
 
         pass
 
