@@ -163,9 +163,19 @@ class MarketCrawler(object):
                 for length in range(1, 7, 1):
                     trs = table.xpath("tbody/tr/td[{}]".format(length))
                     column_item["column{}".format(length)] = [one.text for one in trs]
-                column_item["column1"]= self.replace_column_field(column_item["column1"], ones_tail)
-                new_tables_info.append(column_item)
-            return new_tables_info
+                column_item["column1"] = self.replace_column_field(column_item["column1"], ones_tail)
+                column_class_list = table.xpath("tbody/tr/@class")
+                try:
+                    self.coll_base.insert({"name": column_class_list})
+                except errors.DuplicateKeyError:
+                    pass
+                column_item["column7"] = column_class_list
+                try:
+                    self.coll.insert(column_item)
+                except errors.DuplicateKeyError:
+                    pass
+            #     new_tables_info.append(column_item)
+            # return new_tables_info
 
 
 
