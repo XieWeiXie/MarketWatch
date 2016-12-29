@@ -102,7 +102,7 @@ class MarketCrawler(object):
         """
         comment by paul.xie
         :return:
-         1. 对抓取到的字段进行替换操作，
+         1. 对抓取到的字段进行替换操作
         """
         length_pattern = len(pattern)
         count = 0
@@ -155,25 +155,20 @@ class MarketCrawler(object):
 
                 years_scope = table.xpath("thead//th[@scope][position()<6]")
                 years = [year.text.strip() for year in years_scope]
-                #print years
 
-                # 获取科目样式：年度数据 self.coll_items
-                items = {}
+                # 获取科目样式：年度数据 self.coll_items  获取财务数据： self.coll_vaules
                 column_one = table.xpath("tbody/tr/td[@class='rowTitle']/a")
-                one = [one.tail.strip("\r").strip("\n").strip() for one in column_one]
-                print one
-                column_item = {}
-                for length in range(1, 7, 1):    # 列项目
+                ones_tail = [one.tail.strip("\r").strip("\n").strip() for one in column_one]
+                column_item = {}  # 一张表格的数据
+                for length in range(1, 7, 1):
                     trs = table.xpath("tbody/tr/td[{}]".format(length))
                     column_item["column{}".format(length)] = [one.text for one in trs]
-                a = self.replace_column_field(column_item["column1"], one)
-                print a
-            #     new_column_item[0]["column1"] = self.replace_column_field(new_column_item[0]["column1"], one)
-            #     new_tables_info.append(new_column_item)
-            # print new_tables_info
+                column_item["column1"]= self.replace_column_field(column_item["column1"], ones_tail)
+                new_tables_info.append(column_item)
+            return new_tables_info
 
 
-                # 获取财务数据:  self.coll_values
+
 
     def ticker_flag(self, url):
         """
@@ -208,3 +203,4 @@ if __name__ == "__main__":
     print(url)
     content = marketwatch.download(url)
     tr_content = marketwatch.parse_raw_html(content)
+    print tr_content
