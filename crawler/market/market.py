@@ -11,6 +11,7 @@ import datetime
 import pymongo
 import requests
 import re
+import pyquery
 from conf.config import HOST, DB, PORT, COLLECTION, COLL_BASE, COLL_ITEMS, COLL_VALUES, COLL
 from lxml import etree
 from conf.config import marketwatch_config
@@ -85,16 +86,35 @@ class MarketCrawler(object):
         first, last = new_string_list[0].strip(), new_string_list[1].strip()
         return (first, last)
 
-    def pattern_string(self, raw_string):
+    def pattern_string(self, raw_string, flag=False):
         new_string_list = raw_string.split(' ')
-        fy = new_string_list[3]
-        currency = new_string_list[6]
-        unit = new_string_list[7]
-        if currency and unit and fy:
-            return currency, unit, fy
+        if not flag:
+            fy = new_string_list[3]
+            currency = new_string_list[6]
+            unit = new_string_list[7]
         else:
-            currency, unit, fy = None, None, None
-            return currency, unit, fy
+            fy = None
+            currency = new_string_list[2]
+            unit = new_string_list[3]
+        return currency, unit, fy
+
+    def replace_column_field(self, pattern, new_word):
+        """
+        comment by paul.xie
+        :return:
+         1. 对抓取到的字段进行替换操作，
+        """
+        length_pattern = len(pattern)
+        count = 0
+        for one in range(length_pattern):
+            if pattern[one]:
+                pattern[one] = pattern[one].strip("\r").strip("\t").strip()
+            if pattern[one] is None or pattern[one] == "":
+                pattern[one] = new_word[count]
+                count += 1
+            if count > len(new_word):
+                break
+        return pattern
 
     def parse_raw_html(self, response):
         """
@@ -116,23 +136,44 @@ class MarketCrawler(object):
                 "key": ticker,
                 "ct": datetime.datetime.now()
             }
-            print (base_info)
+            #print (base_info)
             try:
                 self.coll_base.insert(base_info)
             except errors.DuplicateKeyError:
                 pass
             # 表格信息抓取
             tables_info = selector.xpath(self.table)
-            for table in tables_info:
-                title = table.xpath('thead//th[@class="rowTitle"]')[0]
-                print title
+            new_tables_info = []
+            for table in tables_info:    # 表格
+
+                # 获取表格title信息，包括财年，货币类型，货币单位
+                title = table.xpath('thead/tr[@class]/th[@class="rowTitle"]')
                 for one in title:
                     if one.text:
-                        currency, unit, fy = self.pattern_string(one.text)
-                        print (currency, unit, fy)
+                        currency, unit, fy = self.pattern_string(one.text, flag=False)    # 季度无fy字段
+                        #print (currency, unit, fy)
+
+                years_scope = table.xpath("thead//th[@scope][position()<6]")
+                years = [year.text.strip() for year in years_scope]
+                #print years
+
+                # 获取科目样式：年度数据 self.coll_items
+                items = {}
+                column_one = table.xpath("tbody/tr/td[@class='rowTitle']/a")
+                one = [one.tail.strip("\r").strip("\n").strip() for one in column_one]
+                print one
+                column_item = {}
+                for length in range(1, 7, 1):    # 列项目
+                    trs = table.xpath("tbody/tr/td[{}]".format(length))
+                    column_item["column{}".format(length)] = [one.text for one in trs]
+                a = self.replace_column_field(column_item["column1"], one)
+                print a
+            #     new_column_item[0]["column1"] = self.replace_column_field(new_column_item[0]["column1"], one)
+            #     new_tables_info.append(new_column_item)
+            # print new_tables_info
 
 
-
+                # 获取财务数据:  self.coll_values
 
     def ticker_flag(self, url):
         """
@@ -162,7 +203,8 @@ class MarketCrawler(object):
 
 if __name__ == "__main__":
     marketwatch = MarketCrawler()
-    url = marketwatch.get_url("FISV", "INCOME_QUARTER_URL")
-    print (url)
+    url = marketwatch.get_url("FISV", "INCOME_ANNUAL_URL")
+    #url = marketwatch.get_url("FISV", "INCOME_QUARTER_URL")
+    print(url)
     content = marketwatch.download(url)
     tr_content = marketwatch.parse_raw_html(content)
