@@ -31,10 +31,15 @@ def make_dev_ip():
 _DEV_ENV = ['192.168.1.22',]
 
 if make_dev_ip() in _DEV_ENV:
-    HOST = '192.168.100.20'
+    #HOST = '192.168.100.20'
+    HOST = "127.0.0.1"
     PORT = 27017
     DB = 'ada'
     COLLECTION = 'base_stock'
+    COLL_BASE = "base"
+    COLL_ITEMS = "items"
+    COLL_VALUES = "values"
+    COLL = "marketwatch"
 
 USER_AGENT = [
     'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.112 Safari/537.36',

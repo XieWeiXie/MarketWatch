@@ -6,13 +6,16 @@
 @software: PyCharm
 @time: 2016/12/28 13:02
 """
+import datetime
+
+import pymongo
 import requests
 import re
-from conf.config import HOST, DB, PORT, COLLECTION
+from conf.config import HOST, DB, PORT, COLLECTION, COLL_BASE, COLL_ITEMS, COLL_VALUES, COLL
 from lxml import etree
 from conf.config import marketwatch_config
 from pymongo import MongoClient
-
+from pymongo import errors
 
 class MarketCrawler(object):
     category = "marketwatch"
@@ -20,6 +23,10 @@ class MarketCrawler(object):
     def __init__(self):
         # db setting
         self.collection = MongoClient(HOST, PORT)[DB][COLLECTION]
+        self.coll_base = MongoClient(HOST, PORT)[DB][COLL_BASE]
+        self.coll_items = MongoClient(HOST, PORT)[DB][COLL_ITEMS]
+        self.coll_values = MongoClient(HOST, PORT)[DB][COLL_VALUES]
+        self.coll = MongoClient(HOST, PORT)[DB][COLL]
 
         # Field
         self.field = ["Name", "Market", "Ticker", ]
@@ -28,7 +35,8 @@ class MarketCrawler(object):
         self.headers = marketwatch_config["headers"]
 
         # Field pattern
-        self.table = '//div[@class="financials"]/table[@class="crDataTable"]//tr'    # 有返回值, 内容存在;
+        self.instrumentheader = "//div[@id='instrumentheader']"
+        self.table = '//div[@class="financials"]/table[@class="crDataTable"]'    # 有返回值, 内容存在;
         self.partialsum = self.table + "[@class='partialSum']"
         self.childrow = self.table + "[@class='childRow']"
         self.mainrow = self.table + "[@class='mainRow']"
@@ -63,25 +71,68 @@ class MarketCrawler(object):
             raw_html = requests.get(url, headers=self.headers)
             response = raw_html.text
             return response
-        except:
-            print ("error")
+        except requests.ConnectionError:
+            pass
+
+    def split_string(self, raw_string):
+        """
+        comment by paul.xie
+        :param raw_string:
+        :return:
+        1. 处理字符串函数，分割操作
+        """
+        new_string_list = raw_string.split(":")
+        first, last = new_string_list[0].strip(), new_string_list[1].strip()
+        return (first, last)
+
+    def pattern_string(self, raw_string):
+        new_string_list = raw_string.split(' ')
+        fy = new_string_list[3]
+        currency = new_string_list[6]
+        unit = new_string_list[7]
+        if currency and unit and fy:
+            return currency, unit, fy
+        else:
+            currency, unit, fy = None, None, None
+            return currency, unit, fy
 
     def parse_raw_html(self, response):
         """
         comment by paul.xie
         :return:
         """
-        selector = etree.HTML(response)
-        tr_content = selector.xpath(self.table)
-        for one_content in tr_content:
-            one = selector.xpath(self.pattern[1])
-            print(one)
+        if response:
+            selector = etree.HTML(response)
+
+            # 公司代码和名称
+            market_and_ticker = selector.xpath(self.instrumentheader)[0]
+            name = market_and_ticker.xpath("h1")[0].text
+            info = market_and_ticker.xpath('p')[0].text
+            market, ticker = self.split_string(info)
+            base_info = {
+                "name": name,
+                "market": market,
+                "ticker": ticker,
+                "key": ticker,
+                "ct": datetime.datetime.now()
+            }
+            print (base_info)
+            try:
+                self.coll_base.insert(base_info)
+            except errors.DuplicateKeyError:
+                pass
+            # 表格信息抓取
+            tables_info = selector.xpath(self.table)
+            for table in tables_info:
+                title = table.xpath('thead//th[@class="rowTitle"]')[0]
+                print title
+                for one in title:
+                    if one.text:
+                        currency, unit, fy = self.pattern_string(one.text)
+                        print (currency, unit, fy)
 
 
-    def unpickle(self, data):
 
-
-        pass
 
     def ticker_flag(self, url):
         """
