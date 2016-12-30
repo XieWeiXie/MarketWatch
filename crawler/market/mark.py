@@ -258,10 +258,14 @@ class MarketCrawler(object):
 
                 # 样式和数据进行整理
 
-                # 样式字段
+                # 样式字段: parent: 字段未处理干净：从后往前，找到比serie 小1的值即为父节点
+                parent = ""
                 for i in range(len(column_item["column1"])):
                     item = column_item["column1"][i]
-                    serie , level = column_item["column{}".format(length_column+1)][i]
+                    data = column_item["column{}".format(length_column+1)]
+                    serie , level = data[i]
+                    if serie != 1:
+                        parent += None
                     item_info = {
                         "item": item,    # 属性： 科目名称
                         "serie": serie,   # 科目序列 1,2,3,4...
