@@ -116,6 +116,40 @@ class MarketCrawler(object):
                 break
         return pattern
 
+    def clean_column_field(self, pattern_list):
+        length = len(pattern_list)
+        for one in range(length):
+            if len(pattern_list[one])!= 1:
+                for i in pattern_list[one]:
+                    i = i.strip("\r").strip("\n").strip()
+                    if i:
+                        pattern_list[one] = [i]
+
+    def clean_data_field(self, pattern_dict):
+        """
+        comment by paul.xie
+        :param pattern_list: 一张表的数据, 包括6列，数值在第2到6列
+        :return:
+        1. 清洗数值：(19M) 为负数；"-": 为 0
+        2. 转成列表
+        """
+        length = len(pattern_dict)+1
+        new_pattern_dict = {}
+        new_pattern_dict["column1"] = [one[0] for one in pattern_dict["column1"]]
+        for one in range(2, length, 1):
+            old_pattern = pattern_dict['column{}'.format(one)]    # 列
+            length_old_pattern = len(old_pattern)
+            new_one_list = []
+            for each in range(length_old_pattern):
+                field_content = str(old_pattern[each][0])    # 单元格
+                if "(" in field_content:
+                    old_pattern[each][0] = str("-" + field_content[1:-1])
+                if field_content == "-":
+                    old_pattern[each][0] = str(0)
+                new_one_list.append(old_pattern[each][0])
+            new_pattern_dict["column{}".format(one)] = new_one_list
+        return new_pattern_dict
+
     def parse_raw_html(self, response):
         """
         comment by paul.xie
@@ -143,7 +177,6 @@ class MarketCrawler(object):
                 pass
             # 表格信息抓取
             tables_info = selector.xpath(self.table)
-            new_tables_info = []
             for table in tables_info:    # 表格
 
                 # 获取表格title信息，包括财年，货币类型，货币单位
@@ -156,29 +189,34 @@ class MarketCrawler(object):
                 years_scope = table.xpath("thead//th[@scope][position()<6]")
                 years = [year.text.strip() for year in years_scope]
 
-                # 获取科目样式：年度数据 self.coll_items  获取财务数据： self.coll_vaules
+                # 获取科目样式：年度数据  |self.coll_items  获取财务数据： |self.coll_vaules
                 column_one = table.xpath("tbody/tr/td[@class='rowTitle']/a")
-                ones_tail = [one.tail.strip("\r").strip("\n").strip() for one in column_one]
+                ones_tail = [one.tail.strip("\r").strip("\n").strip() for one in column_one]    # 第一列缺失字段
                 column_item = {}  # 一张表格的数据
                 for length in range(1, 7, 1):
                     trs = table.xpath("tbody/tr/td[{}]".format(length))
-                    column_item["column{}".format(length)] = [one.text for one in trs]
-                column_item["column1"] = self.replace_column_field(column_item["column1"], ones_tail)
+                    column_item["column{}".format(length)] = [one.xpath('text()|span/text()') for one in trs]
+                self.clean_column_field(column_item["column1"])
                 column_class_list = table.xpath("tbody/tr/@class")
-                try:
-                    self.coll_base.insert({"name": column_class_list})
-                except errors.DuplicateKeyError:
-                    pass
-                column_item["column7"] = column_class_list
-                try:
-                    self.coll.insert(column_item)
-                except errors.DuplicateKeyError:
-                    pass
-            #     new_tables_info.append(column_item)
-            # return new_tables_info
+                column_item = self.clean_data_field(column_item)
+                # try:
+                #     self.coll_base.insert({"name": column_class_list})
+                # except errors.DuplicateKeyError:
+                #     pass
+                # try:
+                #     self.coll.insert(column_item)
+                # except errors.DuplicateKeyError:
+                #     pass
+                # 样式字段
+                item_info = {
+                    
+
+                }
+                # 值字段
+                values_info = {
 
 
-
+                }
 
     def ticker_flag(self, url):
         """
@@ -214,3 +252,4 @@ if __name__ == "__main__":
     content = marketwatch.download(url)
     tr_content = marketwatch.parse_raw_html(content)
     print tr_content
+
