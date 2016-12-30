@@ -200,7 +200,6 @@ class MarketCrawler(object):
                 "key": ticker,
                 "ct": datetime.datetime.now()
             }
-            #print (base_info)
             try:
                 self.coll_base.insert(base_info)
             except errors.DuplicateKeyError:
@@ -218,6 +217,7 @@ class MarketCrawler(object):
                 years_scope = table.xpath("thead//th[@scope][position()<6]")
                 years = [year.text.strip() for year in years_scope]
                 length_column = len(years) + 2
+
                 # 获取科目样式：年度数据  |self.coll_items  获取财务数据： |self.coll_vaules
                 column_one = table.xpath("tbody/tr/td[@class='rowTitle']/a")
                 ones_tail = [one.tail.strip("\r").strip("\n").strip() for one in column_one]    # 第一列缺失字段
@@ -232,6 +232,14 @@ class MarketCrawler(object):
                 serie_level = self.serie_and_level(column_class_list)
                 column_item["column{}".format(length_column)] = column_class_list
                 column_item["column{}".format(length_column+1)] = serie_level
+                """
+                column_item 详解
+                1. column1: 第一列
+                2. column2-6: 2011~2015年数据
+                3. column7: 第一列的标签值
+                4. column8: 第一列的层级关系
+                """
+
                 # try:
                 #     self.coll_base.insert({"name": column_class_list})
                 # except errors.DuplicateKeyError:
@@ -241,7 +249,10 @@ class MarketCrawler(object):
                 except errors.DuplicateKeyError:
                     pass
 
+                # 样式和数据进行整理
+
                 # 样式字段
+
                 item_info = {
                     "item": None,    # 属性： 科目名称
                     "year": None,    # 时间
@@ -257,7 +268,7 @@ class MarketCrawler(object):
                     "item": None,
                     "value": None,
                     "uid": None,
-                    "type": None,
+                    "type": None,    # 年度 or 季度
                     "year": None,
                     "date": None,
                     "fy": None,
