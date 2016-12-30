@@ -265,7 +265,7 @@ class MarketCrawler(object):
                     data = column_item["column{}".format(length_column+1)]
                     serie , level = data[i]
                     if serie != 1:
-                        parent += None
+                        parent += None 
                     item_info = {
                         "item": item,    # 属性： 科目名称
                         "serie": serie,   # 科目序列 1,2,3,4...
