@@ -180,7 +180,7 @@ class MarketCrawler(object):
                 serie_level.append((serie, level))
         return serie_level
 
-    def parse_raw_html(self, response):
+    def parse_raw_html(self, response, type):
         """
         comment by paul.xie
         :return:
@@ -192,12 +192,14 @@ class MarketCrawler(object):
             market_and_ticker = selector.xpath(self.instrumentheader)[0]
             name = market_and_ticker.xpath("h1")[0].text
             info = market_and_ticker.xpath('p')[0].text
-            market, ticker = self.split_string(info)
+            market, key = self.split_string(info)
+
+            #    公司代码和名称
             base_info = {
                 "name": name,
                 "market": market,
-                "ticker": ticker,
-                "key": ticker,
+                "ticker": info,
+                "key": key,
                 "ct": datetime.datetime.now()
             }
             try:
@@ -210,10 +212,15 @@ class MarketCrawler(object):
 
                 # 获取表格title信息，包括财年，货币类型，货币单位
                 title = table.xpath('thead/tr[@class]/th[@class="rowTitle"]')
+                detail_title = ""
+                currency = ""
+                unit = ""
+                fy = ""
                 for one in title:
                     if one.text:
                         currency, unit, fy = self.pattern_string(one.text, flag=False)    # 季度无fy字段
-                        #print (currency, unit, fy)
+                        detail_title += one.text
+                        #print (currency, unit, fy, detail_title)
                 years_scope = table.xpath("thead//th[@scope][position()<6]")
                 years = [year.text.strip() for year in years_scope]
                 length_column = len(years) + 2
@@ -252,31 +259,44 @@ class MarketCrawler(object):
                 # 样式和数据进行整理
 
                 # 样式字段
-
-                item_info = {
-                    "item": None,    # 属性： 科目名称
-                    "year": None,    # 时间
-                    "serie": None,   # 科目序列
-                    "value": None,   # 值
-                    "level": None,   # 科目层级
-                    "parent": None
-
-                }
+                for i in range(len(column_item["column1"])):
+                    item = column_item["column1"][i]
+                    serie , level = column_item["column{}".format(length_column+1)][i]
+                    item_info = {
+                        "item": item,    # 属性： 科目名称
+                        "serie": serie,   # 科目序列 1,2,3,4...
+                        "level": level,   # 科目层级 L1, L2, L3...
+                        "parent": None,  # 父节点:_id
+                        "type": type,    # 年度 or 季度
+                        "code": None
+                    }
+                    try:
+                        self.coll_items.insert(item_info)
+                    except errors.DuplicateKeyError:
+                        pass
                 # 值字段
-                values_info = {
-                    "key": None,
-                    "item": None,
-                    "value": None,
-                    "uid": None,
-                    "type": None,    # 年度 or 季度
-                    "year": None,
-                    "date": None,
-                    "fy": None,
-                    "currency": None,
-                    "unit": None,
-                    "detail": None,
-                    "ct": datetime.datetime.now()
-                }
+                for j in range(len(column_item["column1"])):
+                    item = column_item["column1"][j]
+                    for k in range(2, length_column):
+                        value = column_item["column{}".format(k)][j]
+                        values_info = {
+                            "key": key,     # 股票简称 ： FISV
+                            "item": item,    # 属性：科目
+                            "value": value,   # 值
+                            "uid": None,     # 根据item, year, key 生成的uid
+                            "type": type,    # 年度 or 季度
+                            "year": years[k-2],    # 年份
+                            "date": None,    # 日期
+                            "fy": fy,      # 区间
+                            "currency": currency,   # 货币单位
+                            "unit": unit,     # 单位
+                            "detail": detail_title,   #
+                            "ct": datetime.datetime.now()
+                        }
+                        try:
+                            self.coll_values.insert(values_info)
+                        except errors.DuplicateKeyError:
+                            pass
 
     def ticker_flag(self, url):
         """
@@ -310,7 +330,7 @@ if __name__ == "__main__":
     #url = marketwatch.get_url("FISV", "INCOME_QUARTER_URL")
     #print(url)
     content = marketwatch.download(url)
-    tr_content = marketwatch.parse_raw_html(content)
+    tr_content = marketwatch.parse_raw_html(content, "fin")
     #print tr_content
     class_list = ['partialSum', 'childRow hidden', 'mainRow', 'rowLevel-2', 'rowLevel-2', 'rowLevel-3', 'rowLevel-3', 'childRow hidden', 'partialSum', 'childRow hidden', 'childRow hidden']
     a= marketwatch.serie_and_level(class_list)
