@@ -18,6 +18,7 @@ from conf.config import marketwatch_config
 from pymongo import MongoClient
 from pymongo import errors
 
+
 class MarketCrawler(object):
     category = "marketwatch"
 
@@ -150,6 +151,35 @@ class MarketCrawler(object):
             new_pattern_dict["column{}".format(one)] = new_one_list
         return new_pattern_dict
 
+    def serie_and_level(self, class_list):
+        """
+        comment by paul.xie
+        :param class_list:
+        :return:
+        1. 判断层级关系对应表
+        2. 输入一个class_list 标签，返回一个嵌套元组的列表
+        """
+        serie_level = []
+        for one in class_list:
+            if one == "partialSum" or one == "mainRow" or one == "totalRow":
+                level = "L1"
+                serie = 1
+                serie_level.append((serie, level))
+            if "childRow" in one:
+                level = "L2"
+                serie = 2
+                serie_level.append((serie, level))
+            if "rowLevel" in one:
+                pattern = r"rowLevel-(\d+)"
+                try:
+                    number = re.findall(pattern, one)[0]
+                except:
+                    pass
+                level = "L" + str(number)
+                serie = int(number)
+                serie_level.append((serie, level))
+        return serie_level
+
     def parse_raw_html(self, response):
         """
         comment by paul.xie
@@ -185,37 +215,56 @@ class MarketCrawler(object):
                     if one.text:
                         currency, unit, fy = self.pattern_string(one.text, flag=False)    # 季度无fy字段
                         #print (currency, unit, fy)
-
                 years_scope = table.xpath("thead//th[@scope][position()<6]")
                 years = [year.text.strip() for year in years_scope]
-
+                length_column = len(years) + 2
                 # 获取科目样式：年度数据  |self.coll_items  获取财务数据： |self.coll_vaules
                 column_one = table.xpath("tbody/tr/td[@class='rowTitle']/a")
                 ones_tail = [one.tail.strip("\r").strip("\n").strip() for one in column_one]    # 第一列缺失字段
                 column_item = {}  # 一张表格的数据
-                for length in range(1, 7, 1):
+                for length in range(1, length_column, 1):
                     trs = table.xpath("tbody/tr/td[{}]".format(length))
                     column_item["column{}".format(length)] = [one.xpath('text()|span/text()') for one in trs]
                 self.clean_column_field(column_item["column1"])
                 column_class_list = table.xpath("tbody/tr/@class")
+                print column_class_list
                 column_item = self.clean_data_field(column_item)
+                serie_level = self.serie_and_level(column_class_list)
+                column_item["column{}".format(length_column)] = column_class_list
+                column_item["column{}".format(length_column+1)] = serie_level
                 # try:
                 #     self.coll_base.insert({"name": column_class_list})
                 # except errors.DuplicateKeyError:
                 #     pass
-                # try:
-                #     self.coll.insert(column_item)
-                # except errors.DuplicateKeyError:
-                #     pass
+                try:
+                    self.coll.insert(column_item)
+                except errors.DuplicateKeyError:
+                    pass
+
                 # 样式字段
                 item_info = {
-                    
+                    "item": None,    # 属性： 科目名称
+                    "year": None,    # 时间
+                    "serie": None,   # 科目序列
+                    "value": None,   # 值
+                    "level": None,   # 科目层级
+                    "parent": None
 
                 }
                 # 值字段
                 values_info = {
-
-
+                    "key": None,
+                    "item": None,
+                    "value": None,
+                    "uid": None,
+                    "type": None,
+                    "year": None,
+                    "date": None,
+                    "fy": None,
+                    "currency": None,
+                    "unit": None,
+                    "detail": None,
+                    "ct": datetime.datetime.now()
                 }
 
     def ticker_flag(self, url):
@@ -248,8 +297,11 @@ if __name__ == "__main__":
     marketwatch = MarketCrawler()
     url = marketwatch.get_url("FISV", "INCOME_ANNUAL_URL")
     #url = marketwatch.get_url("FISV", "INCOME_QUARTER_URL")
-    print(url)
+    #print(url)
     content = marketwatch.download(url)
     tr_content = marketwatch.parse_raw_html(content)
-    print tr_content
+    #print tr_content
+    class_list = ['partialSum', 'childRow hidden', 'mainRow', 'rowLevel-2', 'rowLevel-2', 'rowLevel-3', 'rowLevel-3', 'childRow hidden', 'partialSum', 'childRow hidden', 'childRow hidden']
+    a= marketwatch.serie_and_level(class_list)
+    print a
 
