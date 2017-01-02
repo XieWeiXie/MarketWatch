@@ -190,6 +190,20 @@ class MarketWatch(object):
                     print(value)
                     value = float(value)
             print(value)
+            values_info = {
+                "key": key,  # 股票简称 ： FISV
+                "item": item,  # 属性：科目
+                "value": value,  # 值
+                "uid": None,  # 根据item, year, key 生成的uid
+                "type": type,  # 年度 or 季度
+                "year": years[k - 2],  # 年份
+                "date": None,  # 日期
+                "fy": fy,  # 区间
+                "currency": currency,  # 货币单位
+                "unit": unit,  # 单位
+                "detail": detail_title,  #
+                "ct": datetime.datetime.now()
+            }
 
 
 
