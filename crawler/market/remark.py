@@ -197,8 +197,9 @@ class MarketWatch(object):
                     if item["parent"] is not None:
                         _id = self.coll_template.find_one({"item": item["parent"]})["_id"]
                         item_info["parent"] = _id
-                        #self.coll_template.update_one({"_id":_id}, {"$set":{"parent":xffgdghd}})
-                    self.coll_items.insert_one(item_info)
+                        if self.coll_template.find({"item":item["item"],"serie":item["serie"],"level":item["level"]}):
+                            self.coll_template.update_one({"_id": _id},item_info)
+                    #self.coll_items.insert_one(item_info)
                 except pymongo.errors.OperationFailure as e:
                     self.logger.info("Get pymongo error: e.code<{}>, e.datails<{}>".format(e.code, e.details))
         except:
@@ -253,7 +254,7 @@ class MarketWatch(object):
 
     def main(self):
         thread_num = 4
-        code_ticker = self.ticker_from_db()
+        code_ticker = self.ticker_from_db()[0:10]
         type = self.type
         all_url = [self.urls_ticker(ticker) for ticker in code_ticker]
         pool = ThreadPool(thread_num)
