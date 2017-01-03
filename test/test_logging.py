@@ -7,23 +7,77 @@
 @time: 2017/1/3 13:30
 """
 import logging
-logging.debug('debug message')
-logging.info('info message')
-logging.warn('warn message')
-logging.error('error message')
-logging.critical('critical message')
+
+logger = logging.getLogger("test_logging")
+logger.setLevel(logging.DEBUG)
+
+ch = logging.StreamHandler()
+ch.setLevel(logging.NOTSET)
+
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+logger.addHandler(ch)
+
+logger.debug("0")
+logger.info("1")
+logger.warn("2")
+logger.error("3")
+logger.critical("4")
 
 
-logging.basicConfig(filename='logger.log', level=logging.INFO)
+import logging
+import logging.config
+logging.config.fileConfig("logging_config.ini")
 
-logging.debug('debug message')
-logging.info('info message')
-logging.warn('warn message')
-logging.error('error message')
-logging.critical('critical message')
+logger2 = logging.getLogger("sample")
+logger2.debug("00")
+logger2.info("01")
+logger2.warn("02")
+logger2.error("03")
+logger2.critical("04")
 
 
-logger = logging.getLogger('simple_example')
+import logging
+import logging.config
+
+config = {
+    'version': 1,
+    'formatters': {
+        'simple': {
+            'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'level': 'DEBUG',
+            'formatter': 'simple'
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': 'logging.log',
+            'level': 'DEBUG',
+            'formatter': 'simple'
+        },
+    },
+    'loggers':{
+        'root': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            # 'propagate': True,
+        },
+        'simple': {
+            'handlers': ['console', 'file'],
+            'level': 'WARN',
+        }
+    }
+}
+
+logging.config.dictConfig(config)
+
+
+print 'logger:'
+logger = logging.getLogger('root1')
 
 logger.debug('debug message')
 logger.info('info message')
@@ -32,34 +86,30 @@ logger.error('error message')
 logger.critical('critical message')
 
 
+print 'logger2:'
+logger2 = logging.getLogger('simple1')
+
+logger2.debug('debug message')
+logger2.info('info message')
+logger2.warn('warn message')
+logger2.error('error message')
+logger2.critical('critical message')
+
 import logging
+from log4mongo.handlers import MongoHandler
 
-# create logger
-logger = logging.getLogger('simple2_example')
+logger = logging.getLogger('mongo_example')
 
-# Set default log level
-logger.setLevel(logging.DEBUG)
-
+mon = MongoHandler(host='localhost', database_name='db')
+mon.setLevel(logging.WARNING)
 
 ch = logging.StreamHandler()
-ch.setLevel(logging.WARN)
+ch.setLevel(logging.ERROR)
 
-ch2 = logging.FileHandler('logging.log')
-ch2.setLevel(logging.INFO)
-
-# create formatter
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-# add formatter to ch
-ch.setFormatter(formatter)
-ch2.setFormatter(formatter)
-
-# add ch to logger
-# The final log level is the higher one between the default and the one in handler
+logger.addHandler(mon)
 logger.addHandler(ch)
-logger.addHandler(ch2)
 
-# 'application' code
+
 logger.debug('debug message')
 logger.info('info message')
 logger.warn('warn message')
