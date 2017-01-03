@@ -267,3 +267,8 @@ class MarketWatch(object):
 if __name__ == '__main__':
     A = MarketWatch()
     A.main()
+# Todo: 2017.01.04
+"""
+1. 全局处理信息url
+2. 去重操作整理
+"""
