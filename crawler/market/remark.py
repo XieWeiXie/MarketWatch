@@ -197,6 +197,7 @@ class MarketWatch(object):
                     if item["parent"] is not None:
                         _id = self.coll_template.find_one({"item": item["parent"]})["_id"]
                         item_info["parent"] = _id
+                        #self.coll_template.update_one({"_id":_id}, {"$set":{"parent":xffgdghd}})
                     self.coll_items.insert_one(item_info)
                 except pymongo.errors.OperationFailure as e:
                     self.logger.info("Get pymongo error: e.code<{}>, e.datails<{}>".format(e.code, e.details))

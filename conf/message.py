@@ -26,3 +26,6 @@ def get_logger(to_console=True, to_file=False):
         _logger.addHandler(file_handler)
     return _logger
 logger = get_logger(to_console=True, to_file=False)
+
+def mongo_logger():
+    pass
