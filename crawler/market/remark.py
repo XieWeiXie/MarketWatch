@@ -92,6 +92,7 @@ class MarketWatch(object):
             "key": key,
             "ct": datetime.now()
         }
+        # if self.coll_base.find()
         try:
             self.coll_base.insert(base_info)
         except pymongo.errors.OperationFailure as e:
