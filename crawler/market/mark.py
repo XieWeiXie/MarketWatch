@@ -330,13 +330,14 @@ class MarketCrawler(object):
 
 if __name__ == "__main__":
     marketwatch = MarketCrawler()
-    url = marketwatch.get_url("FISV", "INCOME_ANNUAL_URL")
-    #url = marketwatch.get_url("FISV", "INCOME_QUARTER_URL")
-    #print(url)
-    content = marketwatch.download(url)
-    tr_content = marketwatch.parse_raw_html(content, "fin")
-    #print tr_content
-    class_list = ['partialSum', 'childRow hidden', 'mainRow', 'rowLevel-2', 'rowLevel-2', 'rowLevel-3', 'rowLevel-3', 'childRow hidden', 'partialSum', 'childRow hidden', 'childRow hidden']
-    a= marketwatch.serie_and_level(class_list)
-    print a
+    # url = marketwatch.get_url("FISV", "INCOME_ANNUAL_URL")
+    # #url = marketwatch.get_url("FISV", "INCOME_QUARTER_URL")
+    # #print(url)
+    # content = marketwatch.download(url)
+    # tr_content = marketwatch.parse_raw_html(content, "fin")
+    # #print tr_content
+    # class_list = ['partialSum', 'childRow hidden', 'mainRow', 'rowLevel-2', 'rowLevel-2', 'rowLevel-3', 'rowLevel-3', 'childRow hidden', 'partialSum', 'childRow hidden', 'childRow hidden']
+    # a= marketwatch.serie_and_level(class_list)
+    a = marketwatch.get_tick_from_db()
+    print len(a)
 

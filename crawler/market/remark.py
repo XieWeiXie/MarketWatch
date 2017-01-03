@@ -8,65 +8,75 @@ __project__:Learn_Scrapy
 __file__: remark
 __time__: 2017/1/2 13:22
 """
+from __future__ import absolute_import
+
+import pymongo
 import requests
 import re
+import time
 from lxml import etree
-from mongoengine import *
 from pprint import pprint
 from datetime import datetime
-connect("col")
-
-
-class Base(Document):
-    name = StringField(required=True)
-    market = StringField(required=True)
-    ticker = StringField(required=True)
-    key = StringField(required=True)
-    ct = DateTimeField(default=datetime.now(), required=True)
-    pass
-
-
-class Item(Document):
-    item = StringField(required=True)
-    serie = IntField(required=True)
-    parent = StringField(default=None, required=True)
-    type = StringField(required=True)
-    code = StringField(default=None)
-    level = IntField(required=True)
-    ct = DateTimeField(default=datetime.now())
-    pass
-
-
-class Values(Document):
-    year = StringField(required=True)
-    fy = StringField(required=True)
-    key = StringField(required=True)
-    ct = DateTimeField(required=True)
-    detail = StringField(required=True)
-    item = StringField(required=True)
-    date = StringField(required=True, default=None)
-    type = StringField(required=True)
-    unit = StringField(required=True)
-    currency = StringField(required=True)
-    value = IntField(required=True)
-    pass
+from pymongo import MongoClient
+from conf.model import Base, Item, Values
+from conf.config import COLL_BASE, COLL_ITEMS, COLL_VALUES, COLL_TEMPLATE, DB, COLLECTION, HOST, PORT
+from multiprocessing.dummy import Pool as ThreadPool
+from conf.config import marketwatch_config
+from random import randint, random
+from conf.message import logger
 
 
 class MarketWatch(object):
+    category = "marketwatch"
 
     def __init__(self):
         self.base_url = "http://www.marketwatch.com/investing/Stock/{}/financials"
-        pass
+        #self.base_url = "http://www.marketwatch.com/investing/Stock/{}/financials/balance-sheet"
+        self.coll_base = MongoClient("localhost", 27017)["db"][COLL_BASE]
+        self.coll_template = MongoClient("localhost", 27017)["db"][COLL_TEMPLATE]
+        self.coll_values = MongoClient("localhost", 27017)["db"][COLL_VALUES]
+        self.coll_items = MongoClient("localhost", 27017)["db"][COLL_ITEMS]
+        self.coll = MongoClient(HOST, PORT)[DB][COLLECTION]
+        self.type = ["Annual", "Quarter"]
+        self.keys = ["Income Statement", "Balance Sheet", "Cash Flow Statement"]
+        self.url_keys = ["INCOME_ANNUAL_URL", "BALANCE_ANNUAL_URL", "CASH_ANNUAL_URL","INCOME_QUARTER_URL","BALANCE_QUARTER_URL","CASH_QUARTER_URL"]
+        self.logger = logger
 
-    def fetch(self, tick):
-        url = self.base_url.format(tick)
+    def urls_ticker(self, ticker):
+        try:
+            one_tick_urls = [marketwatch_config[url].format(ticker) for url in self.url_keys]
+            return one_tick_urls
+        except Exception as e:
+            self.logger.info("Get conf error: type<{}>, msg<{}>".format(e.__class__, e))
+
+    def ticker_from_db(self):
+        coll = self.coll
+        try:
+            tickers = coll.find({"code": {"$in": [re.compile("_NY_EQ"), re.compile("_NQ_EQ")]}}, {"tick": 1, "_id": 0})
+            code_ticker = [ticker["tick"] for ticker in tickers]
+            return code_ticker
+        except Exception as e:
+            self.logger.info("Get ticker from mongodb error: type<{}>, msg<{}>".format(e.__class__, e))
+        return ""
+
+    def fetch(self, ticker):
+        url = self.base_url.format(ticker)
         html = requests.session()
-        response = html.get(url)
-        if response.status_code == requests.codes.ok:
-            return response.content
+        try:
+            response = html.get(url)
+            if response.status_code == requests.codes.ok:
+                return response.content
+        except Exception as e:
+            self.logger.info("Get html error: type<{}>, msg<{}>".format(e.__class__, e))
         pass
 
     def parse(self, key, type):
+        """
+
+        :param key: ticker
+        :param type:  year or quarter
+        :return:
+        """
         reponse = self.fetch(key)
         selector = etree.HTML(reponse)
 
@@ -75,14 +85,18 @@ class MarketWatch(object):
         name = market_and_ticker.xpath("h1")[0].xpath("string()").strip("\r\n").strip()
         info = market_and_ticker.xpath('p')[0].xpath("string()").strip("\r\n").strip()
         market = info.split(":")[0]
-        base_info = Base(
-            name=name,
-            market=market,
-            ticker=info,
-            key=key,
-            ct=datetime.now()
-        )
-        base_info.save()
+        base_info = {
+            "name": name,
+            "market": market,
+            "ticker": info,
+            "key": key,
+            "ct": datetime.now()
+        }
+        try:
+            self.coll_base.insert(base_info)
+        except pymongo.errors.OperationFailure as e:
+            self.logger.info("Get pymongo error: e.code<{}>,e.details".format(e.code, e.details))
+            pass
 
         # 获取表格title信息，包括财年，货币类型，货币单位
         detail = ""
@@ -100,75 +114,97 @@ class MarketWatch(object):
             fy = None
             pattern = re.compile(r"All values (.*) (.*).")
             currency, unit = pattern.findall(detail)[0]
-        print(detail, "+", fy, "+", currency, "+", unit)
+        #print(detail, "+", fy, "+", currency, "+", unit)
         years_or_dates = content_topRow.xpath("th[position()>1][position()<6]/text()")
-        # pprint(content_topRow_one)
-        # pprint(years_or_dates)
 
         # 获取items信息,提取层级关系
         items_list = []
         content_firstColumn = selector.xpath("//div/table[@class]//tbody/tr/td[1]")    # 第一列
         for one in content_firstColumn:
             items = {}
-            if one.xpath("a")!=[]:
-                items["item"] = one.xpath("a")[0].tail.strip("\r\t").strip()
-                items["serie"] = 1
-                items["level"] = "L1"
-                items["parent"] = None
-                items["type"] = type
-                items_list.append(items)
-            else:
-                items["item"] = one.text
-                if "mainRow" in one.getparent().get("class"):
+            try:
+                if one.xpath("a")!=[]:
+                    items["item"] = one.xpath("a")[0].tail.strip("\r\t").strip()
                     items["serie"] = 1
                     items["level"] = "L1"
                     items["parent"] = None
                     items["type"] = type
                     items_list.append(items)
-                if "childRow" in one.getparent().get("class"):
-                    items["serie"] = 2
-                    items["level"] = "L2"
-                    items["parent"] = None
-                    items["type"] = type
-                    items_list.append(items)
-                elif "rowLevel" in one.getparent().get("class"):
-                    tag = one.getparent().get("class")
-                    pattern = r"rowLevel-(\d+)"
-                    number = re.findall(pattern, tag)[0]
-                    items["serie"] = int(number)
-                    items["level"] = "L" + str(number)
-                    items["parent"] = None
-                    items["type"] = type
-                    items_list.append(items)
+                else:
+                    items["item"] = one.text
+                    if "mainRow" in one.getparent().get("class"):
+                        items["serie"] = 1
+                        items["level"] = "L1"
+                        items["parent"] = None
+                        items["type"] = type
+                        items_list.append(items)
+                    if "partialSum" in one.getparent().get("class"):
+                        items["serie"] = 1
+                        items["level"] = "L1"
+                        items["parent"] = None
+                        items["type"] = type
+                        items_list.append(items)
+                    if "childRow" in one.getparent().get("class"):
+                        items["serie"] = 2
+                        items["level"] = "L2"
+                        items["parent"] = None
+                        items["type"] = type
+                        items_list.append(items)
+                    elif "rowLevel" in one.getparent().get("class"):
+                        tag = one.getparent().get("class")
+                        pattern = r"rowLevel-(\d+)"
+                        number = re.findall(pattern, tag)[0]
+                        items["serie"] = int(number)
+                        items["level"] = "L" + str(number)
+                        items["parent"] = None
+                        items["type"] = type
+                        items_list.append(items)
+            except Exception as e:
+                self.logger.info("Get xpath error: type<{}>, msg<{}>".format(e.__class__, e))
+
         length = len(items_list)
         new_items_list = []
         for one in range(0, length, 1):
-            if items_list[one]["serie"] == 1:
-                new_items_list.append(items_list[one])
-            else:
-                j = one
-                while True:
-                    j -= 1
-                    if (items_list[one]["serie"] - items_list[j]["serie"]) == 1:
-                        items_list[one]["parent"] = items_list[j]["item"]
-                        new_items_list.append(items_list[one])
-                        break
-        # try:
-        #     for item in new_items_list:
-        #         item_info = Item(
-        #             item=item["item"],
-        #             serie=item["serie"],
-        #             parent=item["parent"],
-        #             type=item["type"],
-        #             level=item["level"],
-        #             code=None,
-        #             ct=datetime.now()
-        #         )
-        #         item_info.save()
-        # except:
-        #     pass
+            try:
+                if items_list[one]["serie"] == 1:
+                    new_items_list.append(items_list[one])
+                else:
+                    j = one
+                    while True:
+                        j -= 1
+                        if (items_list[one]["serie"] - items_list[j]["serie"]) == 1:
+                            items_list[one]["parent"] = items_list[j]["item"]
+                            new_items_list.append(items_list[one])
+                            break
+            except Exception as e:
+                self.logger.info("Get parent field error: type<{}>, msg<{}>".format(e.__class__, e))
+
+        Ratios_items = [item["item"] for item in new_items_list]
+        try:
+            for item in new_items_list:
+                item_info = {
+                    "item": item["item"],
+                    "serie": item["serie"],
+                    "parent": item["parent"],
+                    "type": item["type"],
+                    "level": item["level"],
+                    "code": None,
+                    "ct": datetime.now()
+                }
+                try:
+                    self.coll_template.insert(item_info)
+                    if item["parent"] is not None:
+                        _id = self.coll_template.find_one({"item": item["parent"]})["_id"]
+                        item_info["parent"] = _id
+                    self.coll_items.insert_one(item_info)
+                except pymongo.errors.OperationFailure as e:
+                    self.logger.info("Get pymongo error: e.code<{}>, e.datails<{}>".format(e.code, e.details))
+        except:
+            pass
+
         # values 信息
         content_columm = selector.xpath("//div/table[@class]//tbody/tr/td[position()>1][position()<6]")
+        content_values = []
         for one in content_columm:
             value = one.xpath('text()|span/text()')[0].lower()
             if "(" in value:
@@ -187,28 +223,46 @@ class MarketWatch(object):
                 try:
                     value = int(value)
                 except ValueError:
-                    print(value)
                     value = float(value)
-            print(value)
-            values_info = {
-                "key": key,  # 股票简称 ： FISV
-                "item": item,  # 属性：科目
-                "value": value,  # 值
-                "uid": None,  # 根据item, year, key 生成的uid
-                "type": type,  # 年度 or 季度
-                "year": years[k - 2],  # 年份
-                "date": None,  # 日期
-                "fy": fy,  # 区间
-                "currency": currency,  # 货币单位
-                "unit": unit,  # 单位
-                "detail": detail_title,  #
-                "ct": datetime.datetime.now()
-            }
+            content_values.append(value)
+        for i in range(len(years_or_dates)):
+            for j in range(len(Ratios_items)):
+                values_info = {
+                    "key": key,  # 股票简称 ： FISV
+                    "item": Ratios_items[j],  # 属性：科目
+                    "value": content_values[i:len(content_values):len(years_or_dates)][j],  # 值
+                    "type": type,  # 年度 or 季度
+                    "year": None,  # 年份years_or_dates[i]
+                    "date": None,  # 日期
+                    "fy": fy,  # 区间
+                    "currency": currency,  # 货币单位
+                    "unit": unit,  # 单位
+                    "detail": detail,  #
+                    "ct": datetime.now()
+                }
+                if type == "Annual":
+                    values_info["year"] = years_or_dates[i]
+                else:
+                    values_info["date"] = years_or_dates[i]
+                try:
+                    self.coll_values.insert(values_info)
+                except pymongo.errors.OperationFailure as e:
+                    self.logger.info("Get pymongo error: e.code<{}>, e.datails<{}>".format(e.code, e.details))
 
-
+    def main(self):
+        thread_num = 4
+        code_ticker = self.ticker_from_db()
+        type = self.type
+        all_url = [self.urls_ticker(ticker) for ticker in code_ticker]
+        pool = ThreadPool(thread_num)
+        for i in range(len(code_ticker)):
+            pool.apply_async(self.parse, args=(code_ticker[i], "Quarter"))
+            self.logger.info("MarketWatch Crawl the ticker is <{},{}>, type is <{}>, total tickers<{}>".format(code_ticker[i], i, type[1], len(code_ticker)))
+            wait_time = random()
+            time.sleep(wait_time)
+        pool.close()
+        pool.join()
 
 if __name__ == '__main__':
     A = MarketWatch()
-    b = A.parse("FISV", type="Annual")
-    # pprint(b),print(len(b))
-    pass
+    A.main()

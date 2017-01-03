@@ -31,12 +31,13 @@ def make_dev_ip():
 _DEV_ENV = ['192.168.1.22',]
 
 if make_dev_ip() in _DEV_ENV:
-    #HOST = '192.168.100.20'
-    HOST = "127.0.0.1"
+    HOST = '192.168.100.20'
+    #HOST = "127.0.0.1"
     PORT = 27017
     DB = 'ada'
     COLLECTION = 'base_stock'
     COLL_BASE = "base"
+    COLL_TEMPLATE = "items_template"
     COLL_ITEMS = "items"
     COLL_VALUES = "values"
     COLL = "marketwatch"
@@ -69,7 +70,7 @@ marketwatch_config = {
     "INCOME_QUARTER_URL": BASE_URL+"/income/quarter",
 
     # Balance Sheet
-    "BALANCE_ANNUAL_URL": BASE_URL+ "/balance-sheet",
+    "BALANCE_ANNUAL_URL": BASE_URL + "/balance-sheet",
     "BALANCE_QUARTER_URL": BASE_URL+"/balance-sheet/quarter",
 
     # Cash Flow Statement

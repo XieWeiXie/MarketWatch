@@ -1,0 +1,12 @@
+2017-01-03 13:37:12,224 - simple_example - INFO - info message
+2017-01-03 13:37:12,226 - simple_example - WARNING - warn message
+2017-01-03 13:37:12,226 - simple_example - ERROR - error message
+2017-01-03 13:37:12,226 - simple_example - CRITICAL - critical message
+2017-01-03 13:39:29,503 - simple2_example - INFO - info message
+2017-01-03 13:39:29,503 - simple2_example - WARNING - warn message
+2017-01-03 13:39:29,503 - simple2_example - ERROR - error message
+2017-01-03 13:39:29,503 - simple2_example - CRITICAL - critical message
+2017-01-03 14:56:11,523 - simple2_example - INFO - info message
+2017-01-03 14:56:11,525 - simple2_example - WARNING - warn message
+2017-01-03 14:56:11,525 - simple2_example - ERROR - error message
+2017-01-03 14:56:11,525 - simple2_example - CRITICAL - critical message
