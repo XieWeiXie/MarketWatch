@@ -22,7 +22,7 @@ from conf.model import Base, Item, Values
 from conf.config import COLL_BASE, COLL_ITEMS, COLL_VALUES, COLL_TEMPLATE, DB, COLLECTION, HOST, PORT
 from multiprocessing.dummy import Pool as ThreadPool
 from conf.config import marketwatch_config
-from random import randint, random
+from random import random
 from conf.message import logger
 
 
@@ -39,7 +39,7 @@ class MarketWatch(object):
         self.coll = MongoClient(HOST, PORT)[DB][COLLECTION]
         self.type = ["Annual", "Quarter"]
         self.keys = ["Income Statement", "Balance Sheet", "Cash Flow Statement"]
-        self.url_keys = ["INCOME_ANNUAL_URL", "BALANCE_ANNUAL_URL", "CASH_ANNUAL_URL","INCOME_QUARTER_URL","BALANCE_QUARTER_URL","CASH_QUARTER_URL"]
+        self.url_keys = ["INCOME_ANNUAL_URL", "BALANCE_ANNUAL_URL", "CASH_ANNUAL_URL", "INCOME_QUARTER_URL", "BALANCE_QUARTER_URL","CASH_QUARTER_URL"]
         self.logger = logger
 
     def urls_ticker(self, ticker):
