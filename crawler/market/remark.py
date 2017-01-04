@@ -34,15 +34,16 @@ class MarketWatch(object):
     def __init__(self):
         self.base_url = "http://www.marketwatch.com/investing/Stock/{}/financials"
         #self.base_url = "http://www.marketwatch.com/investing/Stock/{}/financials/balance-sheet"
-        self.coll_base = MongoClient("localhost", 27017)["db2"][COLL_BASE]
-        self.coll_values = MongoClient("localhost", 27017)["db2"][COLL_VALUES]
-        self.coll_items = MongoClient("localhost", 27017)["db2"][COLL_ITEMS]
+        self.coll_base = MongoClient("localhost", 27017)["db3"][COLL_BASE]
+        self.coll_values = MongoClient("localhost", 27017)["db3"][COLL_VALUES]
+        self.coll_items = MongoClient("localhost", 27017)["db3"][COLL_ITEMS]
         self.coll = MongoClient(HOST, PORT)[DB][COLLECTION]
         self.type = ["Annual", "Quarter"]
         self.keys = ["Income Statement", "Balance Sheet", "Cash Flow Statement"]
         self.url_keys = ["INCOME_ANNUAL_URL", "BALANCE_ANNUAL_URL", "CASH_ANNUAL_URL", "INCOME_QUARTER_URL", "BALANCE_QUARTER_URL","CASH_QUARTER_URL"]
         self.logger = logger
         self.user_agent = choice(USER_AGENT)
+        self.coll_base.create_index("ticker", unique=True)
 
     def urls_ticker(self, ticker):
         try:
@@ -80,6 +81,8 @@ class MarketWatch(object):
         :param type:  year or quarter
         :return:
         """
+
+        # self.coll_items.create_index("item", unique=True)
         for number in range(6):
             if number < 3:
                 type = self.type[0]
@@ -103,11 +106,11 @@ class MarketWatch(object):
                 "key": key,
                 "ct": datetime.now()
             }
-            self.coll_base.create_index("ticker", unique=True)
+
             try:
                 self.coll_base.insert(base_info)
             except errors.DuplicateKeyError as e:
-                self.logger.info("Get pymongo error: e.code<{}>,e.details".format(e.code, e.details))
+                self.logger.info("Get pymongo error1: e.code<{}>,e.details<{}>".format(e.code, e.details))
                 pass
 
             # 获取表格title信息，包括财年，货币类型，货币单位
@@ -195,7 +198,7 @@ class MarketWatch(object):
                         self.logger.info("Get parent field error: type<{}>, msg<{}>".format(e.__class__, e))
 
                 Ratios_items = [item["item"] for item in new_items_list]
-                self.coll_items.create_index("item", unique=True)
+
                 for item in new_items_list:
                     item_info = {
                         "item": item["item"],
@@ -204,18 +207,17 @@ class MarketWatch(object):
                         "type": item["type"],
                         "level": item["level"],
                         "code": None,
-                        "ct": datetime.now()
+                        "ct": datetime.now(),
+                        "factor": self.keys[number % 3]
                     }
-
+                    print item_info
                     try:
                         self.coll_items.insert(item_info)
-                        self.coll_items.ensure_index([("item", pymongo.ASCENDING)],  drop_dups=True)
                         if item["parent"] is not None:
                             _id = self.coll_items.find_one({"item": item["parent"]})["_id"]
                             self.coll_items.update_one({"parent": item["parent"]}, {"$set": {"parent":_id}})
-
-                    except errors.OperationFailure as e:
-                        self.logger.info("Get pymongo error: e.code<{}>, e.datails<{}>".format(e.code, e.details))
+                    except errors.DuplicateKeyError as e:
+                        self.logger.info("Get pymongo error2: e.code<{}>, e.datails<{}>".format(e.code, e.details))
 
                 # values 信息
                 content_columm = selector.xpath("//div/table[@class]//tbody/tr/td[position()>1][position()<6]")
@@ -244,7 +246,7 @@ class MarketWatch(object):
                         finally:
                             pass
                     content_values.append(value)
-                self.coll_values.create_index("item", unique=True)
+
                 for i in range(len(years_or_dates)):
                     for j in range(len(Ratios_items)):
                         temp = content_values[i:len(content_values):len(years_or_dates)][j]
@@ -265,25 +267,25 @@ class MarketWatch(object):
                             values_info["year"] = years_or_dates[i]
                         else:
                             values_info["date"] = years_or_dates[i]
-                        last_data = self.coll_values.find_one({"item": Ratios_items[j], "value":temp})
-                        if not last_data:
-                            try:
-                                self.coll_values.insert(values_info)
-                            except pymongo.errors.DuplicateKeyError:
-                                pass
-                            except errors.OperationFailure as e:
-                                self.logger.info("Get pymongo error: e.code<{}>, e.datails<{}>".format(e.code, e.details))
+                        # last_data = self.coll_values.find_one({"item": Ratios_items[j], "value":temp})
+                        # if not last_data:
+                        print values_info
+                        try:
+                            self.coll_values.insert(values_info)
+                        except pymongo.errors.DuplicateKeyError as e:
+                            self.logger.info("Get pymongo error3: e.code<{}>, e.datails<{}>".format(e.code, e.details))
 
     def main(self):
-        thread_num = 10
-        code_ticker = self.ticker_from_db()
+        thread_num = 4
+        code_ticker = self.ticker_from_db()[0:100]
+        print code_ticker
         type = self.type
         all_url = [self.urls_ticker(ticker) for ticker in code_ticker]
-        print all_url
+        # print all_url
         pool = ThreadPool(thread_num)
         for i in range(len(code_ticker)):
             pool.apply_async(self.parse, args=(code_ticker[i],))
-            self.logger.info("MarketWatch Crawl the ticker is <{},{}>, type is <{}>, total tickers<{}>".format(code_ticker[i], i, type[1], len(code_ticker)))
+            self.logger.info("MarketWatch Crawl the ticker is <{},{}>, total tickers<{}>".format(code_ticker[i], i, len(code_ticker)))
         wait_time = random()
         time.sleep(wait_time)
         pool.close()
@@ -299,5 +301,5 @@ if __name__ == '__main__':
 - [x] 3. 判断无数据
 - [x] 4. 判断无表
 - [x] 5. update parent操作
-- [ ] 6. 增加字段显式：incoome statement, balance sheet, cash flow statement
+- [x] 6. 增加字段显式：income statement, balance sheet, cash flow statement
 """
