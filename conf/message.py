@@ -27,5 +27,3 @@ def get_logger(to_console=True, to_file=False):
     return _logger
 logger = get_logger(to_console=True, to_file=False)
 
-def mongo_logger():
-    pass
