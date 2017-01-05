@@ -27,13 +27,11 @@ from conf.message import logger
 from pymongo import errors
 
 
-
 class MarketWatch(object):
     category = "marketwatch"
 
     def __init__(self):
         self.base_url = "http://www.marketwatch.com/investing/Stock/{}/financials"
-        #self.base_url = "http://www.marketwatch.com/investing/Stock/{}/financials/balance-sheet"
         self.coll_base = MongoClient("localhost", 27017)["db3"][COLL_BASE]
         self.coll_values = MongoClient("localhost", 27017)["db3"][COLL_VALUES]
         self.coll_items = MongoClient("localhost", 27017)["db3"][COLL_ITEMS]
@@ -44,6 +42,8 @@ class MarketWatch(object):
         self.logger = logger
         self.user_agent = choice(USER_AGENT)
         self.coll_base.create_index("ticker", unique=True)
+        self.coll_items.create_index([("ticker", pymongo.ASCENDING), ("item", pymongo.ASCENDING), ("factor", pymongo.ASCENDING)], unique=True)
+        self.coll_values.create_index([("item", pymongo.ASCENDING), ("key", pymongo.ASCENDING), ("year", pymongo.ASCENDING), ("value", pymongo.ASCENDING)], unique=True)
 
     def urls_ticker(self, ticker):
         try:
@@ -93,7 +93,7 @@ class MarketWatch(object):
                 selector = etree.HTML(response)
             else:
                 return
-
+            temp_factor = self.keys[number % 3]
             # 公司代码和名称
             market_and_ticker = selector.xpath('//div[@id="instrumentheader"]')[0]
             name = market_and_ticker.xpath("h1")[0].xpath("string()").strip("\r\n").strip()
@@ -106,12 +106,13 @@ class MarketWatch(object):
                 "key": key,
                 "ct": datetime.now()
             }
-
-            try:
-                self.coll_base.insert(base_info)
-            except errors.DuplicateKeyError as e:
-                self.logger.info("Get pymongo error1: e.code<{}>,e.details<{}>".format(e.code, e.details))
-                pass
+            last_base = self.coll_base.find_one({"ticker": key, "name": name, "market": market})
+            if not last_base:
+                try:
+                    self.coll_base.insert(base_info)
+                except errors.DuplicateKeyError as e:
+                    self.logger.info("Get pymongo error1: e.code<{}>,e.details<{}>".format(e.code, e.details))
+                    pass
 
             # 获取表格title信息，包括财年，货币类型，货币单位
             if not selector.xpath("//table"):
@@ -204,18 +205,21 @@ class MarketWatch(object):
                         "item": item["item"],
                         "serie": item["serie"],
                         "parent": item["parent"],
-                        "type": item["type"],
+                        "type": type, #item["type"],
                         "level": item["level"],
                         "code": None,
                         "ct": datetime.now(),
-                        "factor": self.keys[number % 3]
+                        "factor": temp_factor,
+                        "ticker": key,
                     }
-                    print item_info
+                    # print item_info
                     try:
-                        self.coll_items.insert(item_info)
-                        if item["parent"] is not None:
-                            _id = self.coll_items.find_one({"item": item["parent"]})["_id"]
-                            self.coll_items.update_one({"parent": item["parent"]}, {"$set": {"parent":_id}})
+                        last_one = self.coll_items.find_one({"item": item["item"], "ticker": key, "serie":item["serie"]})
+                        if not last_one:
+                            self.coll_items.insert(item_info)
+                            if item["parent"] is not None:
+                                _id = self.coll_items.find_one({"item": item["parent"]})["_id"]
+                                self.coll_items.update_one({"parent": item["parent"]}, {"$set": {"parent": _id}})
                     except errors.DuplicateKeyError as e:
                         self.logger.info("Get pymongo error2: e.code<{}>, e.datails<{}>".format(e.code, e.details))
 
@@ -261,27 +265,25 @@ class MarketWatch(object):
                             "currency": currency,  # 货币单位
                             "unit": unit,  # 单位
                             "detail": detail,  #
-                            "ct": datetime.now()
+                            "ct": datetime.now(),
+                            "factor": temp_factor
                         }
                         if type == "Annual":
                             values_info["year"] = years_or_dates[i]
                         else:
                             values_info["date"] = years_or_dates[i]
-                        # last_data = self.coll_values.find_one({"item": Ratios_items[j], "value":temp})
-                        # if not last_data:
-                        print values_info
-                        try:
-                            self.coll_values.insert(values_info)
-                        except pymongo.errors.DuplicateKeyError as e:
-                            self.logger.info("Get pymongo error3: e.code<{}>, e.datails<{}>".format(e.code, e.details))
+                        last_data = self.coll_values.find_one({"item": Ratios_items[j], "value": temp})
+                        if not last_data:
+                            try:
+                                self.coll_values.insert(values_info)
+                            except pymongo.errors.DuplicateKeyError as e:
+                                self.logger.info("Get pymongo error3: e.code<{}>, e.datails<{}>".format(e.code, e.details))
 
     def main(self):
         thread_num = 4
-        code_ticker = self.ticker_from_db()[0:100]
-        print code_ticker
+        code_ticker = self.ticker_from_db()[0:10]
         type = self.type
         all_url = [self.urls_ticker(ticker) for ticker in code_ticker]
-        # print all_url
         pool = ThreadPool(thread_num)
         for i in range(len(code_ticker)):
             pool.apply_async(self.parse, args=(code_ticker[i],))
@@ -294,6 +296,7 @@ class MarketWatch(object):
 if __name__ == '__main__':
     A = MarketWatch()
     A.main()
+    # A.parse("FISV")
 # Todo: 2017.01.04
 """
 - [x] 1. 全局处理信息url
