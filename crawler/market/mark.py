@@ -18,7 +18,9 @@ from conf.config import marketwatch_config
 from pymongo import MongoClient
 from pymongo import errors
 
-
+"""
+已重写
+"""
 class MarketCrawler(object):
     category = "marketwatch"
 
