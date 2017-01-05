@@ -19,7 +19,7 @@ from pprint import pprint
 from datetime import datetime
 from pymongo import MongoClient
 from conf.model import Base, Item, Values
-from conf.config import COLL_BASE, COLL_ITEMS, COLL_VALUES,  DB, COLLECTION, HOST, PORT
+from conf.config import COLL_BASE, COLL_ITEMS, COLL_VALUES,  DB, COLLECTION, HOST, PORT, PROXIES
 from multiprocessing.dummy import Pool as ThreadPool
 from conf.config import marketwatch_config, USER_AGENT
 from random import random, choice
@@ -32,9 +32,9 @@ class MarketWatch(object):
 
     def __init__(self):
         self.base_url = "http://www.marketwatch.com/investing/Stock/{}/financials"
-        self.coll_base = MongoClient("localhost", 27017)["db3"][COLL_BASE]
-        self.coll_values = MongoClient("localhost", 27017)["db3"][COLL_VALUES]
-        self.coll_items = MongoClient("localhost", 27017)["db3"][COLL_ITEMS]
+        self.coll_base = MongoClient("localhost", 27017)["db"][COLL_BASE]
+        self.coll_values = MongoClient("localhost", 27017)["db"][COLL_VALUES]
+        self.coll_items = MongoClient("localhost", 27017)["db"][COLL_ITEMS]
         self.coll = MongoClient(HOST, PORT)[DB][COLLECTION]
         self.type = ["Annual", "Quarter"]
         self.keys = ["Income Statement", "Balance Sheet", "Cash Flow Statement"]
@@ -44,6 +44,7 @@ class MarketWatch(object):
         self.coll_base.create_index("ticker", unique=True)
         self.coll_items.create_index([("ticker", pymongo.ASCENDING), ("item", pymongo.ASCENDING), ("factor", pymongo.ASCENDING)], unique=True)
         self.coll_values.create_index([("item", pymongo.ASCENDING), ("key", pymongo.ASCENDING), ("year", pymongo.ASCENDING), ("value", pymongo.ASCENDING)], unique=True)
+        self.proxies = {"http": PROXIES}
 
     def urls_ticker(self, ticker):
         try:
@@ -66,6 +67,7 @@ class MarketWatch(object):
         url = self.urls_ticker(ticker)[number]
         html = requests.session()
         html.headers.update({"User-Agent": self.user_agent})
+        html.proxies = self.proxies
         try:
             response = html.get(url)
             if response.status_code == requests.codes.ok and response.url == url:
@@ -281,7 +283,7 @@ class MarketWatch(object):
 
     def main(self):
         thread_num = 4
-        code_ticker = self.ticker_from_db()[0:10]
+        code_ticker = self.ticker_from_db()[0:100]
         type = self.type
         all_url = [self.urls_ticker(ticker) for ticker in code_ticker]
         pool = ThreadPool(thread_num)

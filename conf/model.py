@@ -27,6 +27,7 @@ class Item(Document):
     code = StringField(default=None)
     level = IntField(required=True)
     ct = DateTimeField(default=datetime.now())
+    factor = StringField()
     pass
 
 
@@ -42,4 +43,5 @@ class Values(Document):
     unit = StringField(required=True)
     currency = StringField(required=True)
     value = IntField(required=True)
+    factor = StringField()
     pass
