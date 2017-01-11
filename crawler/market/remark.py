@@ -14,6 +14,7 @@ import pymongo
 import requests
 import re
 import time
+import hashlib
 from lxml import etree
 from pprint import pprint
 from datetime import datetime
@@ -32,9 +33,9 @@ class MarketWatch(object):
 
     def __init__(self):
         self.base_url = "http://www.marketwatch.com/investing/Stock/{}/financials"
-        self.coll_base = MongoClient("localhost", 27017)["db"][COLL_BASE]
-        self.coll_values = MongoClient("localhost", 27017)["db"][COLL_VALUES]
-        self.coll_items = MongoClient("localhost", 27017)["db"][COLL_ITEMS]
+        self.coll_base = MongoClient("localhost", 27017)["db5"][COLL_BASE]
+        self.coll_values = MongoClient("localhost", 27017)["db5"][COLL_VALUES]
+        self.coll_items = MongoClient("localhost", 27017)["db5"][COLL_ITEMS]
         self.coll = MongoClient(HOST, PORT)[DB][COLLECTION]
         self.type = ["Annual", "Quarter"]
         self.keys = ["Income Statement", "Balance Sheet", "Cash Flow Statement"]
@@ -42,8 +43,8 @@ class MarketWatch(object):
         self.logger = logger
         self.user_agent = choice(USER_AGENT)
         self.coll_base.create_index("ticker", unique=True)
-        self.coll_items.create_index([("ticker", pymongo.ASCENDING), ("item", pymongo.ASCENDING), ("factor", pymongo.ASCENDING)], unique=True)
-        self.coll_values.create_index([("item", pymongo.ASCENDING), ("key", pymongo.ASCENDING), ("year", pymongo.ASCENDING), ("value", pymongo.ASCENDING)], unique=True)
+        # self.coll_items.create_index([("ticker", pymongo.ASCENDING), ("item", pymongo.ASCENDING), ("factor", pymongo.ASCENDING)], unique=True)
+        # self.coll_values.create_index([("item", pymongo.ASCENDING), ("key", pymongo.ASCENDING), ("year", pymongo.ASCENDING), ("date", pymongo.ASCENDING)], unique=True)
         self.proxies = {"http": PROXIES}
 
     def urls_ticker(self, ticker):
@@ -76,6 +77,12 @@ class MarketWatch(object):
             self.logger.info("Get html error: type<{}>, msg<{}>".format(e.__class__, e))
         pass
 
+    def get_md5(self, dict_item):
+        md = hashlib.md5()
+        temp_item = "_".join("%s:%s" % (key, value) for key, value in dict_item.items() if key not in ("ct")).encode("utf-8")
+        md.update(temp_item)
+        return md.hexdigest()
+
     def parse(self, key, type=None):
         """
 
@@ -83,8 +90,7 @@ class MarketWatch(object):
         :param type:  year or quarter
         :return:
         """
-
-        # self.coll_items.create_index("item", unique=True)
+        type=None
         for number in range(6):
             if number < 3:
                 type = self.type[0]
@@ -128,8 +134,14 @@ class MarketWatch(object):
                 content_topRow_one = content_topRow.xpath("th[1]/text()")
                 if type == "Annual":
                     detail = content_topRow_one[0]
-                    pattern = re.compile(r"Fiscal year is (.*). All values (.*) (.*).")
-                    fy, currency, unit = pattern.findall(detail)[0]
+                    if "values" in detail:
+                        pattern = re.compile(r"Fiscal year is (.*). All values (.*) (.*).")
+                        fy, currency, unit = pattern.findall(detail)[0]
+                    else:
+                        pattern = re.compile(r"Fiscal year is (.*).")
+                        fy = pattern.findall(detail)[0]
+                        currency = None,
+                        unit = None
                 if type == "Quarter":
                     detail = content_topRow_one[0]
                     fy = None
@@ -154,6 +166,12 @@ class MarketWatch(object):
                         else:
                             items["item"] = one.text
                             if "mainRow" in one.getparent().get("class"):
+                                items["serie"] = 1
+                                items["level"] = "L1"
+                                items["parent"] = None
+                                items["type"] = type
+                                items_list.append(items)
+                            if "totalRow" in one.getparent().get("class"):
                                 items["serie"] = 1
                                 items["level"] = "L1"
                                 items["parent"] = None
@@ -207,7 +225,7 @@ class MarketWatch(object):
                         "item": item["item"],
                         "serie": item["serie"],
                         "parent": item["parent"],
-                        "type": type, #item["type"],
+                        "type": type,
                         "level": item["level"],
                         "code": None,
                         "ct": datetime.now(),
@@ -215,8 +233,10 @@ class MarketWatch(object):
                         "ticker": key,
                     }
                     # print item_info
+                    md5_id = self.get_md5(item_info)
+                    item_info["md5"] = md5_id
                     try:
-                        last_one = self.coll_items.find_one({"item": item["item"], "ticker": key, "serie":item["serie"]})
+                        last_one = self.coll_items.find_one({"md5":md5_id})
                         if not last_one:
                             self.coll_items.insert(item_info)
                             if item["parent"] is not None:
@@ -252,10 +272,13 @@ class MarketWatch(object):
                         finally:
                             pass
                     content_values.append(value)
+                print len(Ratios_items)
+                print len(content_values)
 
                 for i in range(len(years_or_dates)):
                     for j in range(len(Ratios_items)):
                         temp = content_values[i:len(content_values):len(years_or_dates)][j]
+                        # print temp
                         values_info = {
                             "key": key,  # 股票简称 ： FISV
                             "item": Ratios_items[j],  # 属性：科目
@@ -270,11 +293,15 @@ class MarketWatch(object):
                             "ct": datetime.now(),
                             "factor": temp_factor
                         }
+
                         if type == "Annual":
                             values_info["year"] = years_or_dates[i]
                         else:
                             values_info["date"] = years_or_dates[i]
-                        last_data = self.coll_values.find_one({"item": Ratios_items[j], "value": temp})
+                        md5_values = self.get_md5(values_info)
+                        values_info["md5_values"] = md5_values
+                        # print values_info
+                        last_data = self.coll_values.find_one({"md5_values": md5_values})
                         if not last_data:
                             try:
                                 self.coll_values.insert(values_info)
@@ -298,13 +325,4 @@ class MarketWatch(object):
 if __name__ == '__main__':
     A = MarketWatch()
     A.main()
-    # A.parse("FISV")
-# Todo: 2017.01.04
-"""
-- [x] 1. 全局处理信息url
-- [x] 2. 去重操作整理:1. 添加index, 2. 最后一条数据判断
-- [x] 3. 判断无数据
-- [x] 4. 判断无表
-- [x] 5. update parent操作
-- [x] 6. 增加字段显式：income statement, balance sheet, cash flow statement
-"""
+    # A.parse("CLNT")
