@@ -38,12 +38,12 @@ for row in range(0, length1):
 for row in range(0, length2):
     if length3 > 65536:
         length3 = 65536
-    write(ws_items, items_data[row], row, 10)
+    write(ws_items, items_data[row], row, 11)
 
 for row in range(0, length3):
     if length3 > 65536:
         length3 = 65536
 
-    write(ws_values, values_data[row], row, 13)
+    write(ws_values, values_data[row], row, 14)
 
-wb.save("base_item_values.xls")
+wb.save("base_item_values_new.xls")
