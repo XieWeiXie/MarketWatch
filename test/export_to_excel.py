@@ -28,7 +28,7 @@ length3 = len(values_data)
 
 def write(sheet, data, r, c):
     value = [one for one in data.values()]
-    map(lambda i:sheet.write(r, i, str(value[i])),[i for i in range(c)])
+    map(lambda i : sheet.write(r, i, str(value[i])), [i for i in range(c)])
 
 for row in range(0, length1):
     if length3 > 65536:
