@@ -9,9 +9,9 @@
 import xlwt
 from pymongo import MongoClient
 from datetime import datetime
-collection1 = MongoClient()["db"]["base"]
-collection2 = MongoClient()["db"]["items"]
-collection3 = MongoClient()["db"]["values"]
+collection1 = MongoClient()["db5"]["base"]
+collection2 = MongoClient()["db5"]["items"]
+collection3 = MongoClient()["db5"]["values"]
 wb = xlwt.Workbook()
 wb.encoding = "utf-8"
 ws_base = wb.add_sheet("base")
@@ -31,12 +31,19 @@ def write(sheet, data, r, c):
     map(lambda i:sheet.write(r, i, str(value[i])),[i for i in range(c)])
 
 for row in range(0, length1):
+    if length3 > 65536:
+        length3 = 65536
     write(ws_base, base_data[row], row, 6)
 
 for row in range(0, length2):
+    if length3 > 65536:
+        length3 = 65536
     write(ws_items, items_data[row], row, 10)
 
 for row in range(0, length3):
+    if length3 > 65536:
+        length3 = 65536
+
     write(ws_values, values_data[row], row, 13)
 
-wb.save("one.xls")
+wb.save("base_item_values.xls")

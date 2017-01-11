@@ -43,8 +43,8 @@ class MarketWatch(object):
         self.logger = logger
         self.user_agent = choice(USER_AGENT)
         self.coll_base.create_index("ticker", unique=True)
-        self.coll_items.create_index(("md5_id", pymongo.ASCENDING), unique=True)
-        self.coll_values.create_index(("md5_values", pymongo.ASCENDING), unique=True)
+        self.coll_items.create_index([("md5", pymongo.ASCENDING)], unique=True)
+        self.coll_values.create_index([("md5_values", pymongo.ASCENDING)], unique=True)
         self.proxies = {"http": PROXIES}
 
     def urls_ticker(self, ticker):
@@ -271,8 +271,8 @@ class MarketWatch(object):
                         finally:
                             pass
                     content_values.append(value)
-                print len(Ratios_items)
-                print len(content_values)
+                # print len(Ratios_items)
+                # print len(content_values)
 
                 for i in range(len(years_or_dates)):
                     for j in range(len(Ratios_items)):
@@ -323,5 +323,5 @@ class MarketWatch(object):
 
 if __name__ == '__main__':
     A = MarketWatch()
-    A.main()
-    # A.parse("CLNT")
+    # A.main()
+    A.parse("DL")
