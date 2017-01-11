@@ -43,8 +43,8 @@ class MarketWatch(object):
         self.logger = logger
         self.user_agent = choice(USER_AGENT)
         self.coll_base.create_index("ticker", unique=True)
-        # self.coll_items.create_index([("ticker", pymongo.ASCENDING), ("item", pymongo.ASCENDING), ("factor", pymongo.ASCENDING)], unique=True)
-        # self.coll_values.create_index([("item", pymongo.ASCENDING), ("key", pymongo.ASCENDING), ("year", pymongo.ASCENDING), ("date", pymongo.ASCENDING)], unique=True)
+        self.coll_items.create_index(("md5_id", pymongo.ASCENDING), unique=True)
+        self.coll_values.create_index(("md5_values", pymongo.ASCENDING), unique=True)
         self.proxies = {"http": PROXIES}
 
     def urls_ticker(self, ticker):
@@ -147,7 +147,6 @@ class MarketWatch(object):
                     fy = None
                     pattern = re.compile(r"All values (.*) (.*).")
                     currency, unit = pattern.findall(detail)[0]
-                #print(detail, "+", fy, "+", currency, "+", unit)
                 years_or_dates = content_topRow.xpath("th[position()>1][position()<6]/text()")
 
                 # 获取items信息,提取层级关系
