@@ -151,7 +151,8 @@ class MarketWatch(object):
                     fy = None
                     pattern = re.compile(r"All values (.*) (.*).")
                     currency, unit = pattern.findall(detail)[0]
-                years_or_dates = content_topRow.xpath("th[position()>1][position()<6]/text()")
+                years_or_dates_temp = content_topRow.xpath("th[position()>1][position()<6]")
+                years_or_dates = [one.text for one in years_or_dates_temp]
 
                 # 获取items信息,提取层级关系
                 items_list = []
@@ -275,8 +276,9 @@ class MarketWatch(object):
                         finally:
                             pass
                     content_values.append(value)
-                # print len(Ratios_items)
-                # print len(content_values)
+                print len(Ratios_items)
+                print len(content_values)
+                print years_or_dates
 
                 for i in range(len(years_or_dates)):
                     for j in range(len(Ratios_items)):
@@ -328,4 +330,4 @@ class MarketWatch(object):
 if __name__ == '__main__':
     A = MarketWatch()
     A.main()
-    # A.parse("DL")
+    # A.parse("CBP")
