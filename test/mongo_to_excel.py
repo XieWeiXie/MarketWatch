@@ -8,6 +8,7 @@
 """
 from pymongo import MongoClient
 from xlwt import Workbook
+from xlwt import easyxf
 
 
 class MongoToXls(object):
@@ -17,6 +18,7 @@ class MongoToXls(object):
         self.sheet_name = name
         self.wb = Workbook()
         self.ws = [self.wb.add_sheet(one) for one in self.sheet_name]
+        self.style = easyxf("align: vert centre, horiz center")
         pass
 
     def info(self, number):
@@ -30,7 +32,7 @@ class MongoToXls(object):
         ws = self.ws[number]
         _, columns = self.info(number)
         for i in range(0, columns):
-            ws.write(0, i, self.headers[i])
+            ws.write(0, i, self.headers[i], style=self.style)
 
     def write_content(self, number):
         ws = self.ws[number]
@@ -39,10 +41,10 @@ class MongoToXls(object):
             rows = 65535
         for j in range(1, rows + 1):
             for k in range(0, columns):
-                ws.write(j, k, str(self.contents[j - 1][self.headers[k]]))
+                ws.write(j, k, str(self.contents[j - 1][self.headers[k]]), style=self.style)
 
     def save(self):
-        name = "_".join(self.sheet_name) + str(".xls")
+        name = "_".join(self.sheet_name) +"2"+ str(".xls")
         self.wb.save(str(name))
 
 collection1 = MongoClient()["db5"]["base"]

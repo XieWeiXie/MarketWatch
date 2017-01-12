@@ -138,19 +138,29 @@ class MarketWatch(object):
                 content_topRow_one = content_topRow.xpath("th[1]/text()")
                 if type == "Annual":
                     detail = content_topRow_one[0]
-                    if "values" in detail:
-                        pattern = re.compile(r"Fiscal year is (.*). All values (.*) (.*).")
-                        fy, currency, unit = pattern.findall(detail)[0]
+                    if detail != " ":
+                        if "values" in detail:
+                            pattern = re.compile(r"Fiscal year is (.*). All values (.*) (.*).")
+                            fy, currency, unit = pattern.findall(detail)[0]
+                        else:
+                            pattern = re.compile(r"Fiscal year is (.*).")
+                            fy = pattern.findall(detail)[0]
+                            currency = None,
+                            unit = None
                     else:
-                        pattern = re.compile(r"Fiscal year is (.*).")
-                        fy = pattern.findall(detail)[0]
-                        currency = None,
+                        fy= None
+                        currency = None
                         unit = None
                 if type == "Quarter":
                     detail = content_topRow_one[0]
-                    fy = None
-                    pattern = re.compile(r"All values (.*) (.*).")
-                    currency, unit = pattern.findall(detail)[0]
+                    if detail != ' ':
+                        fy = None
+                        pattern = re.compile(r"All values (.*) (.*).")
+                        currency, unit = pattern.findall(detail)[0]
+                    else:
+                        fy = None
+                        currency = None
+                        unit = None
                 years_or_dates_temp = content_topRow.xpath("th[position()>1][position()<6]")
                 years_or_dates = [one.text for one in years_or_dates_temp]
 
@@ -168,26 +178,29 @@ class MarketWatch(object):
                             items["type"] = type
                             items_list.append(items)
                         else:
-                            items["item"] = one.text
                             if "mainRow" in one.getparent().get("class"):
+                                items["item"] = one.text
                                 items["serie"] = 1
                                 items["level"] = "L1"
                                 items["parent"] = None
                                 items["type"] = type
                                 items_list.append(items)
                             if "totalRow" in one.getparent().get("class"):
+                                items["item"] = one.text
                                 items["serie"] = 1
                                 items["level"] = "L1"
                                 items["parent"] = None
                                 items["type"] = type
                                 items_list.append(items)
                             if "partialSum" in one.getparent().get("class"):
+                                items["item"] = one.text
                                 items["serie"] = 1
                                 items["level"] = "L1"
                                 items["parent"] = None
                                 items["type"] = type
                                 items_list.append(items)
                             if "childRow" in one.getparent().get("class"):
+                                items["item"] = one.text
                                 items["serie"] = 2
                                 items["level"] = "L2"
                                 items["parent"] = None
@@ -197,6 +210,7 @@ class MarketWatch(object):
                                 tag = one.getparent().get("class")
                                 pattern = r"rowLevel-(\d+)"
                                 number = re.findall(pattern, tag)[0]
+                                items["item"] = one.text
                                 items["serie"] = int(number)
                                 items["level"] = "L" + str(number)
                                 items["parent"] = None
@@ -223,10 +237,12 @@ class MarketWatch(object):
                         self.logger.info("Get parent field error: type<{}>, msg<{}>".format(e.__class__, e))
 
                 Ratios_items = [item["item"] for item in new_items_list]
-
+                # pprint (Ratios_items)
+                # print len(Ratios_items)
+                count = 0
                 for item in new_items_list:
                     item_info = {
-                        "item": item["item"],
+                        "item": Ratios_items[count],#item["item"],
                         "serie": item["serie"],
                         "parent": item["parent"],
                         "type": type,
@@ -236,8 +252,9 @@ class MarketWatch(object):
                         "factor": temp_factor,
                         "ticker": key,
                     }
-                    # print item_info
-                    md5_id = self.get_md5(item_info)
+                    count += 1
+                    print item_info
+                    md5_id = self.get_md5(item_info, count)
                     item_info["md5"] = md5_id
                     try:
                         last_one = self.coll_items.find_one({"md5": md5_id})
@@ -276,9 +293,6 @@ class MarketWatch(object):
                         finally:
                             pass
                     content_values.append(value)
-                print len(Ratios_items)
-                print len(content_values)
-                print years_or_dates
 
                 for i in range(len(years_or_dates)):
                     for j in range(len(Ratios_items)):
@@ -330,4 +344,4 @@ class MarketWatch(object):
 if __name__ == '__main__':
     A = MarketWatch()
     A.main()
-    # A.parse("CBP")
+    # A.parse("CO")
