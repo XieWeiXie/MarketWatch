@@ -77,10 +77,14 @@ class MarketWatch(object):
             self.logger.info("Get html error: type<{}>, msg<{}>".format(e.__class__, e))
         pass
 
-    def get_md5(self, dict_item):
+    def get_md5(self, dict_item, number=None):
         md = hashlib.md5()
-        temp_item = "_".join("%s:%s" % (key, value) for key, value in dict_item.items() if key not in ("ct")).encode("utf-8")
-        md.update(temp_item)
+        if number:
+            temp_item = ("_".join("%s:%s" % (key, value) for key, value in dict_item.items() if key not in ("ct")) + "_" + str(number)).encode("utf-8")
+            md.update(temp_item)
+        else:
+            temp_item = "_".join("%s:%s" % (key, value) for key, value in dict_item.items() if key not in ("ct")).encode("utf-8")
+            md.update(temp_item)
         return md.hexdigest()
 
     def parse(self, key, type=None):
@@ -235,7 +239,7 @@ class MarketWatch(object):
                     md5_id = self.get_md5(item_info)
                     item_info["md5"] = md5_id
                     try:
-                        last_one = self.coll_items.find_one({"md5":md5_id})
+                        last_one = self.coll_items.find_one({"md5": md5_id})
                         if not last_one:
                             self.coll_items.insert(item_info)
                             if item["parent"] is not None:
@@ -297,7 +301,7 @@ class MarketWatch(object):
                             values_info["year"] = years_or_dates[i]
                         else:
                             values_info["date"] = years_or_dates[i]
-                        md5_values = self.get_md5(values_info)
+                        md5_values = self.get_md5(values_info, j)
                         values_info["md5_values"] = md5_values
                         # print values_info
                         last_data = self.coll_values.find_one({"md5_values": md5_values})
@@ -308,7 +312,7 @@ class MarketWatch(object):
                                 self.logger.info("Get pymongo error3: e.code<{}>, e.datails<{}>".format(e.code, e.details))
 
     def main(self):
-        thread_num = 4
+        thread_num = 6
         code_ticker = self.ticker_from_db()[0:100]
         type = self.type
         all_url = [self.urls_ticker(ticker) for ticker in code_ticker]
@@ -323,5 +327,5 @@ class MarketWatch(object):
 
 if __name__ == '__main__':
     A = MarketWatch()
-    # A.main()
-    A.parse("DL")
+    A.main()
+    # A.parse("DL")
