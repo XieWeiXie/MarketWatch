@@ -7,7 +7,6 @@
 @time: 2017/1/13 10:45
 """
 from pprint import pprint
-
 from pymongo import MongoClient
 
 class Count(object):
