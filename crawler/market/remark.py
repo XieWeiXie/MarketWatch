@@ -15,11 +15,12 @@ import requests
 import re
 import time
 import hashlib
+import multiprocessing
 from lxml import etree
 from pprint import pprint
 from datetime import datetime
 from pymongo import MongoClient
-from conf.model import Base, Item, Values
+#from conf.model import Base, Item, Values
 from conf.config import (COLL_BASE, COLL_ITEMS, COLL_VALUES,
                          DB, DB_MARKET, COLLECTION, HOST, PORT, PROXIES)
 from multiprocessing.dummy import Pool as ThreadPool
@@ -329,7 +330,7 @@ class MarketWatch(object):
                                 self.logger.info("Get pymongo error3: e.code<{}>, e.datails<{}>".format(e.code, e.details))
 
     def main(self):
-        thread_num = 4
+        thread_num = multiprocessing.cpu_count()
         code_ticker = self.ticker_from_db()#[0:100]
         type = self.type
         all_url = [self.urls_ticker(ticker) for ticker in code_ticker]
